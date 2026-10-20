@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: folhas-prova
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: ANTHROPIC_BASE_URL
+        value: https://api.kpalabz.com/
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: MODEL
+        value: claude-sonnet-5-5

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Folhas da prova</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>Folhas da prova</h1>
+  <p class="sub">Anexe as fotos da prova e receba as respostas em folhas com letra manuscrita.</p>
+
+  <section>
+    <label class="drop" for="file">
+      <span>Escolher fotos da prova</span>
+      <small>Pode anexar várias de uma vez (até 12)</small>
+    </label>
+    <input id="file" type="file" accept="image/*" multiple hidden>
+    <div id="thumbs"></div>
+    <label class="check"><input id="compact" type="checkbox" checked> Nas questões de marcar, só número e letra</label>
+    <button id="go" type="button">Gerar folhas</button>
+    <p id="status" role="status"></p>
+  </section>
+
+  <div id="results"></div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
