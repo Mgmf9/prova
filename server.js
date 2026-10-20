@@ -39,7 +39,7 @@ Rules:
 - One exam object per distinct exam. Photos may show several pages of the same exam in any order: merge them into one object, sorted by the printed question order. If a question shows up in more than one photo, include it once.
 - Use the numbering printed on the exam (for example "5.12").
 - Read each prompt carefully: "completamento errato", "NOT", "except" and similar ask for the WRONG alternative. For multiple-answer questions, list every correct letter.
-- Written answers: same language as the exam, written the way a good student would on the few ruled lines provided: 2 to 4 sentences with the essential points and key terms. If the question asks for N items, give exactly N numbered lines.
+- Written answers: same language as the exam, written the way a good student would on the few ruled lines provided: 2 to 4 sentences. Cover every key idea the question asks for (the definition, the reason, the causes, the examples) and use the standard technical terms from the course; do not drop an essential point. Always put a space after every full stop. If the question asks for N items, give exactly N numbered lines.
 - Calculations and fill-in blanks: put the final value in each blank, plain text, powers written like 10^-6.
 - If part of a question is cut off or unreadable, still give your best answer, set confidence to "low" and explain in "note".
 - If two alternatives share the same letter, say so in "note".
