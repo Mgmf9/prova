@@ -43,7 +43,8 @@ Rules:
 - Calculations and fill-in blanks: put the final value in each blank, plain text, powers written like 10^-6.
 - If part of a question is cut off or unreadable, still give your best answer, set confidence to "low" and explain in "note".
 - If two alternatives share the same letter, say so in "note".
-- Never invent questions that are not visible in the photos.`;
+- Never invent questions that are not visible in the photos.
+- The reply must be strictly valid JSON. Inside any string value never use the double-quote character: write quotation marks as « » or single quotes. Escape nothing else; no trailing commas.`;
 
 function parseJson(text) {
   let t = text.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
@@ -99,7 +100,19 @@ app.post('/api/solve', async (req, res) => {
       messages: [{ role: 'user', content }],
     });
     const text = msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-    res.json(parseJson(text));
+    try {
+      return res.json(parseJson(text));
+    } catch (firstErr) {
+      console.error('JSON inválido, tentando consertar:', firstErr.message);
+      const fix = await client.messages.create({
+        model: MODEL,
+        max_tokens: 8000,
+        system: 'You repair broken JSON. Return ONLY the corrected, strictly valid JSON, same content and structure, no commentary. Replace any double quotes inside string values with « » and remove trailing commas.',
+        messages: [{ role: 'user', content: text }],
+      });
+      const fixed = fix.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+      return res.json(parseJson(fixed));
+    }
   } catch (e) {
     console.error(e);
     const status = e.status && e.status >= 400 && e.status < 600 ? e.status : 500;
