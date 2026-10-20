@@ -61,12 +61,16 @@ function buildItems(exam, compact) {
   return items;
 }
 
+function fixSpaces(t) {
+  return String(t ?? '').replace(/([.!?;:])(?=[A-ZÀ-ÖØ-Þ])/g, '$1 ');
+}
+
 function paginate(items) {
   const maxw = RIGHT - LEFT;
   const laid = items.map((it) => {
     const lab = it.label ? wrap(it.label, LBL, maxw - (it.pts ? 150 : 0)) : [];
     let lines = [];
-    for (const a of it.answers) lines = lines.concat(wrap(a, HAND, maxw));
+    for (const a of it.answers) lines = lines.concat(wrap(fixSpaces(a), HAND, maxw));
     const n = Math.max(lines.length, 1);
     const h = (lab.length ? 30 * lab.length : 0) + 8 + LH * n + 26;
     return { ...it, lab, lines, n, h };
@@ -268,4 +272,3 @@ $('#go').addEventListener('click', async () => {
     btn.disabled = false;
   }
 });
-
