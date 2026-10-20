@@ -55,6 +55,17 @@ function parseJson(text) {
 
 app.get('/healthz', (_req, res) => res.send('ok'));
 
+app.get('/api/models', async (_req, res) => {
+  try {
+    if (MOCK) return res.json({ models: [] });
+    const ids = [];
+    for await (const m of client.models.list({ limit: 100 })) ids.push(m.id);
+    res.json({ current: MODEL, models: ids });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Não consegui listar os modelos.' });
+  }
+});
+
 app.post('/api/solve', async (req, res) => {
   try {
     const images = req.body?.images;
