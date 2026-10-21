@@ -350,15 +350,34 @@ $('#go').addEventListener('click', async () => {
   if (!photos.length) return setStatus('Anexe pelo menos uma foto.', true);
   const btn = $('#go');
   btn.disabled = true;
-  setStatus('Lendo a prova e respondendo… isso pode levar cerca de um minuto.');
+  // Mostra o tempo passando e desiste depois de 10 minutos, em vez de ficar parado para sempre.
+  const started = Date.now();
+  const tick = () => {
+    const s = Math.round((Date.now() - started) / 1000);
+    setStatus(`Lendo a prova e respondendo… ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} (costuma levar de 1 a 3 minutos)`);
+  };
+  tick();
+  const clock = setInterval(tick, 1000);
+  const ctrl = new AbortController();
+  const limit = setTimeout(() => ctrl.abort(), 10 * 60 * 1000);
   try {
     const r = await fetch('/api/solve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ images: photos.map((p) => ({ data: p.data, type: p.type })) }),
+      signal: ctrl.signal,
+    }).catch((err) => {
+      throw new Error(err.name === 'AbortError'
+        ? 'Demorou mais de 10 minutos e eu desisti. Tente de novo, ou com menos fotos.'
+        : 'Perdi a conexão com o servidor. Se você acabou de atualizar o site, espere o Render ficar Live e tente de novo.');
     });
+    clearInterval(clock);
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || `Erro ${r.status}`);
+    if (!r.ok) {
+      throw new Error(j.error || (r.status === 502 || r.status === 503
+        ? `Erro ${r.status}: o servidor reiniciou no meio do pedido (às vezes é o Render publicando uma versão nova). Tente de novo.`
+        : `Erro ${r.status}`));
+    }
     exams = normalizeExams((j.exams || []).filter((e) => (e.questions || []).length));
     if (!exams.length) throw new Error('Não encontrei questões nas fotos. Tente fotos mais nítidas.');
     setStatus('Pronto. Confira as respostas marcadas com "conferir" antes de usar.');
@@ -366,6 +385,8 @@ $('#go').addEventListener('click', async () => {
   } catch (e) {
     setStatus(e.message, true);
   } finally {
+    clearInterval(clock);
+    clearTimeout(limit);
     btn.disabled = false;
   }
 });
