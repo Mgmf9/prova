@@ -264,7 +264,12 @@ $('#go').addEventListener('click', async () => {
     if (!r.ok) throw new Error(j.error || `Erro ${r.status}`);
     exams = (j.exams || []).filter((e) => (e.questions || []).length);
     if (!exams.length) throw new Error('Não encontrei questões nas fotos. Tente fotos mais nítidas.');
-    setStatus('Pronto. Confira as respostas marcadas com "conferir" antes de usar.');
+    const hasDup = exams.some((e) => {
+      const seen = new Set();
+      return (e.questions || []).some((q) => { const k = String(q.number); if (seen.has(k)) return true; seen.add(k); return false; });
+    });
+    if (hasDup) setStatus('Atenção: há números de questão repetidos, então duas provas podem ter se misturado. Mande as fotos de uma prova por vez.', true);
+    else setStatus('Pronto. Confira as respostas marcadas com "conferir" antes de usar.');
     await showResults();
   } catch (e) {
     setStatus(e.message, true);
