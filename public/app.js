@@ -30,6 +30,12 @@ function fitText(ctx, text, x, y, maxw, size) {
   ctx.fillText(text, x, y);
 }
 
+function joinProse(arr) {
+  const list = (arr || []).map((x) => String(x ?? '')).filter((x) => x.trim());
+  const numbered = list.some((l) => /^\s*\d+[.)]\s/.test(l));
+  return numbered || list.length <= 1 ? list : [list.join(' ')];
+}
+
 function buildItems(exam, compact) {
   const items = [];
   let block = null;
@@ -39,7 +45,7 @@ function buildItems(exam, compact) {
       const letters = (q.answer_letters || []).map((l) => String(l).toLowerCase());
       if (compact) {
         if (!block) block = { label: '', pts: '', answers: [] };
-        block.answers.push(`${q.number}. ${letters.map((l) => l + ')').join(' e ')}`);
+        block.answers.push(`${q.number}. ${letters.length ? letters.map((l) => l + ')').join(' e ') : '?'}`);
       } else {
         flush();
         items.push({
@@ -53,7 +59,7 @@ function buildItems(exam, compact) {
       items.push({
         label: `${q.number}. ${q.prompt || ''}`,
         pts: q.points || '',
-        answers: Array.isArray(q.answer) ? q.answer : [String(q.answer || '')],
+        answers: joinProse(Array.isArray(q.answer) ? q.answer : [String(q.answer || '')]),
       });
     }
   }
