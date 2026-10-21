@@ -29,20 +29,24 @@ Schema:
   "student_line":"copy the exam's own wording for the name line, with the name left blank, e.g. \\"Alunno: ____________\\"",
   "header_lines":["up to 2 short lines printed at the top: class, subject, title"],
   "questions":[
-    {"number":"1","type":"choice","prompt":"short version of the question, max 140 chars","options":{"a":"alternative text","b":"..."},"answer_letters":["b"],"confidence":"high","note":""},
+    {"number":"1","type":"choice","prompt":"short version of the question, max 140 chars","options":{"a":"alternative text","b":"..."},"asks_for":"correct","answer_letters":["b"],"confidence":"high","note":""},
     {"number":"21","type":"written","prompt":"short version of the question","points":"(__/3 pti)","answer":["paragraph or numbered line","..."],"confidence":"high","note":""},
     {"number":"19","type":"fill","prompt":"...","points":"","answer":["1 µm = 10^-6 m","..."],"confidence":"high","note":""}
   ]
 }]}
 
 Rules:
-- One exam object per distinct exam. Photos may show several pages of the same exam in any order: merge them into one object, sorted by the printed question order. If a question shows up in more than one photo, include it once.
+- One exam object per distinct exam. Two pages belong to the same exam ONLY if their printed titles match. Different printed titles (for example "Fondamenti della microbiologia" versus "EDUCAZIONE CIVICA: Il microbiota umano") are different exams: never put questions from two titles in one exam, even when the question numbers collide. Pages of the same exam may come in any order: merge them, sorted by printed question order. If a question shows up in more than one photo, include it once.
+- Stems and options can be split across photos or pages: a list of alternatives at the top of a photo belongs to the question stem at the bottom of the previous photo. Join them. Copy each prompt as printed. Never replace a question with a different one, and never write a question that is not printed.
 - Use the numbering printed on the exam (for example "5.12").
-- Read each prompt carefully: "completamento errato", "NOT", "except" and similar ask for the WRONG alternative. For multiple-answer questions, list every correct letter.
+- For every choice question first fill "asks_for": "wrong" if the stem asks for the incorrect option ("errato", "NON è", "NOT", "except", "falso"), otherwise "correct". When asks_for is "wrong", answer_letters must contain ONLY the false alternative(s), never the true ones. Re-check this before answering. For multiple-answer questions, list every letter that satisfies the stem.
 - Written answers: same language as the exam, written the way a good student would on the few ruled lines provided: 2 to 4 sentences. Cover every key idea the question asks for (the definition, the reason, the causes, the examples) and use the standard technical terms from the course; do not drop an essential point. Always put a space after every full stop. If the question asks for N items, give exactly N numbered lines.
 - Calculations and fill-in blanks: put the final value in each blank, plain text, powers written like 10^-6.
 - If part of a question is cut off or unreadable, still give your best answer, set confidence to "low" and explain in "note".
 - If two alternatives share the same letter, say so in "note".
+- Exams are told apart by the title printed in the header (for example "Fondamenti della microbiologia" vs "EDUCAZIONE CIVICA: Il microbiota umano") and by the numbering: if the numbering restarts at 1 or the topic changes, it is ANOTHER exam. Never merge two exams into one object. Pages without a header belong to the exam whose numbering and topic they continue.
+- A question can start at the bottom of one photo while its alternatives continue at the top of another photo (or a page can be cut off): join them into one question. Always answer the question exactly as printed. NEVER replace a question with a different one and never turn a multiple-choice question into an open question.
+- For a choice question give exactly ONE letter in answer_letters, unless the printed question says it has several correct answers (e.g. "risposta multipla", "2 risposte corrette"). Before answering a question that asks for the wrong/incorrect completion ("errato", "NON", "tranne"), check every alternative one by one and pick the false one.
 - Never invent questions that are not visible in the photos.
 - The reply must be strictly valid JSON. Inside any string value never use the double-quote character: write quotation marks as « » or single quotes. Escape nothing else; no trailing commas.`;
 
