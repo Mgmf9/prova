@@ -106,6 +106,7 @@ function buildItems(exam, compact) {
     if (q.type === 'choice') {
       const letters = (q.answer_letters || []).map((l) => String(l).toLowerCase());
       if (compact) {
+        if (!letters.length) continue; // sem letra não vira linha vazia na folha; fica marcada para conferir
         if (!block) block = { label: '', pts: '', answers: [] };
         block.answers.push(`${q.number}. ${letters.map((l) => l + ')').join(' e ')}`);
       } else {
@@ -257,7 +258,8 @@ function renderEditor(exam, sheetsBox, n) {
     p.className = 'p';
     const num = document.createElement('b'); num.textContent = q.number + '. ';
     p.append(num, (q.prompt || '').slice(0, 140));
-    if (q.confidence === 'low' || q.confidence === 'medium') {
+    const noLetter = q.type === 'choice' && !(q.answer_letters || []).length;
+    if (q.confidence === 'low' || q.confidence === 'medium' || noLetter) {
       const bd = document.createElement('span'); bd.className = 'badge'; bd.textContent = 'conferir'; p.appendChild(bd);
     }
     row.appendChild(p);
@@ -279,7 +281,9 @@ function renderEditor(exam, sheetsBox, n) {
       ta.oninput = () => { q.answer = ta.value.split('\n').filter((l) => l.trim()); refresh(); };
       row.appendChild(ta);
     }
-    if (q.note) { const nt = document.createElement('p'); nt.className = 'note'; nt.textContent = q.note; row.appendChild(nt); }
+    for (const t of [q.why, q.note]) {
+      if (t) { const nt = document.createElement('p'); nt.className = 'note'; nt.textContent = t; row.appendChild(nt); }
+    }
     det.appendChild(row);
   }
   return det;
