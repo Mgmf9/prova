@@ -22,11 +22,15 @@ const client = MOCK
       maxRetries: 1,
     });
 
-// Passo 1: descobrir quais fotos são de qual prova.
-const GROUP_SYSTEM = `You sort photos of printed school exams.
-One upload can mix pages of DIFFERENT exams. Two photos belong to the same exam when they share the printed header (title, subject, topic) or when one clearly continues the other (same topic and question numbering that continues). Two exams with different titles or topics are always different exams, even if they have the same subject or teacher.
-Reply with ONE JSON object and nothing else: {"groups":[[1,2],[3]]}
-Each inner list holds the photo numbers of one exam, in page order. Every photo number appears in exactly one list.`;
+// Passo 1: descrever cada foto para saber qual página é de qual prova.
+const GROUP_SYSTEM = `You look at photos of printed school exams. One upload can mix pages of DIFFERENT exams, and usually only the first page of an exam shows the printed header; the other pages just continue the questions.
+For every photo report:
+- "photo": its number
+- "exam": a letter for the exam the page belongs to (same letter = same exam). Different titles or topics are different exams, even with the same subject or teacher. A page without a header belongs to the exam whose questions it continues.
+- "header": the exam title printed at the top of that page, copied exactly; empty string if that page shows no header
+- "topic": 2 to 6 words about the subject of the questions on that page
+- "first" and "last": the first and last question numbers visible on that page, as printed (for example "5.4")
+Reply with ONE JSON object and nothing else: {"photos":[{"photo":1,"exam":"A","header":"","topic":"","first":"","last":""}]}`;
 
 // Passo 2: responder uma prova de cada vez.
 const SYSTEM = `You read photos of ONE school exam and answer every question on it.
@@ -35,9 +39,9 @@ Reply with ONE JSON object and nothing else (no markdown fences, no commentary).
 Schema:
 {"exams":[{
   "student_line":"copy the exam's own wording for the name line, with the name left blank, e.g. \\"Alunno: ____________\\"",
-  "header_lines":["up to 2 short lines printed at the top: class, subject, title"],
+  "header_lines":["up to 2 short lines copied from the header printed at the top: class, subject, title"],
   "questions":[
-    {"number":"1","type":"choice","prompt":"short version of the question, max 140 chars","answer_letters":["b"],"answer_text":["text of alternative b"],"confidence":"high","note":""},
+    {"number":"1","type":"choice","prompt":"short version of the question, max 140 chars","options":{"a":"alternative a, max 80 chars","b":"...","c":"...","d":"..."},"why":"one short sentence on why the chosen alternative is right","answer_letters":["b"],"confidence":"high","note":""},
     {"number":"21","type":"written","prompt":"short version of the question","points":"(__/3 pti)","answer":["the whole answer, as one string"],"confidence":"high","note":""},
     {"number":"22","type":"written","prompt":"a question that asks for three items","points":"(__/3 pti)","answer":["1. first item","2. second item","3. third item"],"confidence":"high","note":""},
     {"number":"19","type":"fill","prompt":"...","points":"","answer":["1 µm = 10^-6 m","..."],"confidence":"high","note":""}
@@ -47,10 +51,12 @@ Schema:
 Rules:
 - All the photos are pages of the same exam, in any order, maybe repeated: return exactly one exam object, with the questions in the printed order and each question only once.
 - A question can start at the bottom of one photo and continue at the top of another: join the pieces into one question.
-- Use the numbering printed on the exam (for example "5.12").
-- Read each prompt carefully: "completamento errato", "NOT", "except" and similar ask for the WRONG alternative. For multiple-answer questions, list every correct letter.
-- answer_text: the text of each correct alternative, in the same order as answer_letters.
-- Written answers: same language as the exam, written the way a good student would on the few ruled lines provided: 2 to 4 sentences. Cover every key idea the question asks for (the definition, the reason, the causes, the examples) and use the standard technical terms from the course; do not drop an essential point. Always put a space after every full stop.
+- Pages can be printed in two columns: read each question together with the alternatives printed right below it, in the same column.
+- Another sheet can show up rotated or partly in a corner of a photo: read the questions on it too.
+- Use the numbering printed on the exam (for example "5.12"). Only real questions: never turn a stray number into a question.
+- header_lines: copy only what is printed. If no photo shows the header, leave the list empty; never invent a title.
+- Multiple choice: first copy every alternative into "options" exactly as printed (same letters, keep the letter case), then write "why", and only then choose. Pick only letters that exist in "options". Read each prompt carefully: "completamento errato", "NOT", "except" and similar ask for the WRONG alternative. For multiple-answer questions, list every correct letter. Never leave answer_letters empty: if unsure, pick the most likely and set confidence to "low".
+- Written answers: same language as the exam, the way a good student would write them on the 3 or 4 ruled lines provided: at most 3 sentences, about 30 to 60 words in total. Cover every key idea the question asks for (the definition, the reason, the causes, the examples) and use the standard technical terms from the course; do not drop an essential point. Always put a space after every full stop.
 - Put a written answer in ONE string. Never split a sentence or a paragraph into several strings to fit the lines: the site breaks the lines itself. Only when the question asks for N items, give exactly N strings, each one starting with its number ("1. ...").
 - Calculations and fill-in blanks: one string per blank with the final value, plain text, powers written like 10^-6 and subscripts like H_2O.
 - If part of a question is cut off or unreadable, still give your best answer, set confidence to "low" and explain in "note".
@@ -87,27 +93,66 @@ function photoBlocks(images, nums, keepNumbers) {
   return content;
 }
 
+const topNum = (q) => parseInt(String(q || ''), 10);
+const dotPrefix = (q) => (String(q || '').match(/^(\d+)\./) || [])[1] || null;
+const longWords = (s) => new Set(String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').match(/[a-z]{5,}/g) || []);
+
+// Quanto uma página sem cabeçalho (g) parece continuar uma prova com cabeçalho (h).
+function continuesScore(g, h) {
+  let s = 0;
+  const hNums = h.photos.flatMap((p) => [p.first, p.last]).filter(Boolean);
+  const gFirst = g.photos.map((p) => p.first).filter(Boolean);
+  if (gFirst.some((q) => dotPrefix(q) && hNums.some((x) => dotPrefix(x) === dotPrefix(q)))) s += 3;
+  const tops = hNums.map(topNum).filter(Number.isFinite);
+  if (tops.length && gFirst.some((q) => topNum(q) >= Math.min(...tops) && topNum(q) <= Math.max(...tops) + 1)) s += 1;
+  const gw = longWords(g.photos.map((p) => p.topic).join(' '));
+  const hw = longWords(h.photos.map((p) => `${p.header} ${p.topic}`).join(' '));
+  let common = 0;
+  for (const w of gw) if (hw.has(w)) common++;
+  return s + Math.min(common, 3);
+}
+// Desempate: a prova com foto logo antes vence.
+const photoGap = (h, g) => Math.min(...h.nums.flatMap((a) => g.nums.map((b) => (a < b ? b - a : 100 + a - b))));
+
 async function groupPhotos(images) {
   const total = images.length;
   const all = images.map((_, i) => i + 1);
   if (total === 1) return [all];
   try {
     const content = photoBlocks(images, all, true);
-    content.push({ type: 'text', text: `São ${total} fotos. Agrupe por prova e devolva só o JSON.` });
-    const { text } = await ask(GROUP_SYSTEM, content, 600);
-    const seen = new Set();
-    const groups = (parseJson(text).groups || [])
-      .map((g) => (Array.isArray(g) ? g : []).map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= total && !seen.has(n) && seen.add(n)))
-      .filter((g) => g.length);
-    if (!groups.length) throw new Error('nenhum grupo');
-    // Foto esquecida pela IA: vai para o grupo da foto vizinha.
-    for (const n of all) {
-      if (seen.has(n)) continue;
-      const near = groups.find((g) => g.includes(n - 1)) || groups.find((g) => g.includes(n + 1)) || groups[0];
-      near.push(n);
-      seen.add(n);
+    content.push({ type: 'text', text: `São ${total} fotos. Descreva cada uma e devolva só o JSON.` });
+    const { text } = await ask(GROUP_SYSTEM, content, 1500);
+    const info = new Map();
+    for (const p of parseJson(text).photos || []) {
+      const n = Number(p && p.photo);
+      if (Number.isInteger(n) && n >= 1 && n <= total && !info.has(n)) info.set(n, p);
     }
-    return groups.sort((a, b) => Math.min(...a) - Math.min(...b));
+    if (!info.size) throw new Error('nenhuma foto descrita');
+    // Foto esquecida pela IA: mesma prova da foto vizinha.
+    for (const n of all) {
+      if (!info.has(n)) info.set(n, { exam: (info.get(n - 1) || info.get(n + 1) || [...info.values()][0]).exam, header: '', topic: '', first: '', last: '' });
+    }
+    const byExam = new Map();
+    for (const n of all) {
+      const key = String(info.get(n).exam || 'A').trim().toUpperCase() || 'A';
+      if (!byExam.has(key)) byExam.set(key, { nums: [], photos: [] });
+      byExam.get(key).nums.push(n);
+      byExam.get(key).photos.push(info.get(n));
+    }
+    const groups = [...byExam.values()];
+    const headed = groups.filter((g) => g.photos.some((p) => String(p.header || '').trim()));
+    // Uma "prova" sem nenhuma página com cabeçalho é, na verdade, continuação de outra.
+    if (headed.length) {
+      for (const g of groups) {
+        if (headed.includes(g)) continue;
+        const best = headed
+          .map((h) => ({ h, s: continuesScore(g, h) }))
+          .sort((a, b) => b.s - a.s || photoGap(a.h, g) - photoGap(b.h, g))[0].h;
+        best.nums.push(...g.nums);
+        best.photos.push(...g.photos);
+      }
+    }
+    return (headed.length ? headed : groups).map((g) => g.nums.sort((a, b) => a - b)).sort((a, b) => a[0] - b[0]);
   } catch (e) {
     console.error('Não consegui separar as provas; mando todas as fotos juntas:', e.message);
     return [all];
