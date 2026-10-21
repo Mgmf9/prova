@@ -192,8 +192,17 @@ function renderEditor(exam, sheetsBox, n) {
     } else {
       const ta = document.createElement('textarea');
       ta.value = (Array.isArray(q.answer) ? q.answer : [q.answer || '']).join('\n');
-      ta.oninput = () => { q.answer = ta.value.split('\n').filter((l) => l.trim()); refresh(); };
-      row.appendChild(ta);
+      const warn = document.createElement('p');
+      warn.className = 'note';
+      warn.style.color = '#c0392b';
+      const check = () => {
+        const n = Number(q.ruled_lines) || 0;
+        const len = ta.value.length;
+        warn.textContent = n && len > n * 65 ? `Longa para as ${n} linhas da prova (${len} caracteres; cabem cerca de ${n * 65}). Encurte.` : '';
+      };
+      ta.oninput = () => { q.answer = ta.value.split('\n').filter((l) => l.trim()); check(); refresh(); };
+      row.append(ta, warn);
+      check();
     }
     if (q.note) { const nt = document.createElement('p'); nt.className = 'note'; nt.textContent = q.note; row.appendChild(nt); }
     det.appendChild(row);
