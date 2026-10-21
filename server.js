@@ -76,12 +76,34 @@ function parseJson(text) {
 }
 
 // Streaming: a conexão fica viva enquanto a resposta chega, então respostas longas não estouram o tempo.
-async function ask(system, content, maxTokens) {
-  const msg = await client.messages
-    .stream({ model: MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content }] })
-    .finalMessage();
-  const text = msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-  return { text, stop: msg.stop_reason };
+// Se a API ficar muda por IDLE_MS, ou passar de TOTAL_MS no total, a chamada é cancelada em vez de travar o site.
+const IDLE_MS = Number(process.env.IDLE_MS) || 90 * 1000;
+const TOTAL_MS = 4 * 60 * 1000;
+async function ask(system, content, maxTokens, label) {
+  const started = Date.now();
+  const stream = client.messages.stream({ model: MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content }] });
+  let idle;
+  const kick = () => { clearTimeout(idle); idle = setTimeout(() => stream.abort(), IDLE_MS); };
+  const total = setTimeout(() => stream.abort(), TOTAL_MS);
+  kick();
+  stream.on('streamEvent', kick);
+  try {
+    const msg = await stream.finalMessage();
+    console.log(`[${label}] ${Math.round((Date.now() - started) / 1000)}s, ${msg.usage?.output_tokens ?? '?'} tokens, fim: ${msg.stop_reason}`);
+    const text = msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    return { text, stop: msg.stop_reason };
+  } catch (e) {
+    if (stream.aborted) {
+      console.error(`[${label}] cancelado depois de ${Math.round((Date.now() - started) / 1000)}s sem resposta completa`);
+      const err = new Error('A API demorou demais para responder. Tente de novo daqui a pouco, ou com menos fotos.');
+      err.timeout = true;
+      throw err;
+    }
+    throw e;
+  } finally {
+    clearTimeout(idle);
+    clearTimeout(total);
+  }
 }
 
 function photoBlocks(images, nums, keepNumbers) {
@@ -122,7 +144,7 @@ async function groupPhotos(images) {
   try {
     const content = photoBlocks(images, all, true);
     content.push({ type: 'text', text: `São ${total} fotos. Descreva cada uma e devolva só o JSON.` });
-    const { text } = await ask(GROUP_SYSTEM, content, 1500);
+    const { text } = await ask(GROUP_SYSTEM, content, 1500, 'separar provas');
     const info = new Map();
     for (const p of parseJson(text).photos || []) {
       const n = Number(p && p.photo);
@@ -155,6 +177,7 @@ async function groupPhotos(images) {
     }
     return (headed.length ? headed : groups).map((g) => g.nums.sort((a, b) => a - b)).sort((a, b) => a[0] - b[0]);
   } catch (e) {
+    if (e.timeout) throw e; // API travada: não adianta tentar de novo com todas as fotos
     console.error('Não consegui separar as provas; mando todas as fotos juntas:', e.message);
     return [all];
   }
@@ -163,7 +186,7 @@ async function groupPhotos(images) {
 async function solveExam(images, nums) {
   const content = photoBlocks(images, nums, false);
   content.push({ type: 'text', text: 'Responda todas as questões das fotos. Devolva apenas o JSON.' });
-  const first = await ask(SYSTEM, content, 16000);
+  const first = await ask(SYSTEM, content, 16000, `responder fotos ${nums.join(',')}`);
   if (first.stop === 'max_tokens') {
     throw new Error('A resposta da IA ficou grande demais e foi cortada. Mande menos fotos de cada vez.');
   }
@@ -171,7 +194,7 @@ async function solveExam(images, nums) {
     return parseJson(first.text);
   } catch (firstErr) {
     console.error('JSON inválido, tentando consertar:', firstErr.message);
-    const fix = await ask(REPAIR_SYSTEM, [{ type: 'text', text: first.text }], 16000);
+    const fix = await ask(REPAIR_SYSTEM, [{ type: 'text', text: first.text }], 16000, 'consertar JSON');
     return parseJson(fix.text);
   }
 }
