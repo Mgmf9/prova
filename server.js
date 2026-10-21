@@ -38,11 +38,11 @@ Reply with ONE JSON object and nothing else (no markdown fences, no commentary).
 
 Schema:
 {"exams":[{
-  "student_line":"copy the exam's own wording for the name line, with the name left blank, e.g. \\"Alunno: ____________\\"",
-  "header_lines":["up to 2 short lines copied from the header printed at the top: class, subject, title"],
+  "student_line":"copy the exam's own wording for the name line, with the name left blank, plus the class if it is printed in the header, e.g. \\"Alunno: ____________   cl. 3 BTCS\\"",
+  "header_lines":["up to 2 lines copied from the header printed at the top: subject and title (the class goes in student_line)"],
   "questions":[
-    {"number":"1","type":"choice","prompt":"short version of the question, max 140 chars","options":{"a":"alternative a, max 80 chars","b":"...","c":"...","d":"..."},"why":"one short sentence on why the chosen alternative is right","answer_letters":["b"],"confidence":"high","note":""},
-    {"number":"21","type":"written","prompt":"short version of the question","points":"(__/3 pti)","answer":["the whole answer, as one string"],"confidence":"high","note":""},
+    {"number":"1","type":"choice","prompt":"the question exactly as printed, without the alternatives","options":{"a":"alternative a, max 80 chars","b":"...","c":"...","d":"..."},"why":"one short sentence on why the chosen alternative is right","answer_letters":["b"],"confidence":"high","note":""},
+    {"number":"21","type":"written","prompt":"the question exactly as printed","points":"(__/3 pti)","answer":["the whole answer, as one string"],"confidence":"high","note":""},
     {"number":"22","type":"written","prompt":"a question that asks for three items","points":"(__/3 pti)","answer":["1. first item","2. second item","3. third item"],"confidence":"high","note":""},
     {"number":"19","type":"fill","prompt":"...","points":"","answer":["1 µm = 10^-6 m","..."],"confidence":"high","note":""}
   ]
@@ -54,6 +54,7 @@ Rules:
 - Pages can be printed in two columns: read each question together with the alternatives printed right below it, in the same column.
 - Another sheet can show up rotated or partly in a corner of a photo: read the questions on it too.
 - Use the numbering printed on the exam (for example "5.12"). Only real questions: never turn a stray number into a question.
+- prompt: copy the question word for word as printed; never shorten or paraphrase it, and answer exactly what it asks.
 - header_lines: copy only what is printed. If no photo shows the header, leave the list empty; never invent a title.
 - Multiple choice: first copy every alternative into "options" exactly as printed (same letters, keep the letter case), then write "why", and only then choose. Pick only letters that exist in "options". Read each prompt carefully: "completamento errato", "NOT", "except" and similar ask for the WRONG alternative. For multiple-answer questions, list every correct letter. Never leave answer_letters empty: if unsure, pick the most likely and set confidence to "low".
 - Written answers: same language as the exam, the way a good student would write them on the 3 or 4 ruled lines provided: at most 3 sentences, about 30 to 60 words in total. Cover every key idea the question asks for (the definition, the reason, the causes, the examples) and use the standard technical terms from the course; do not drop an essential point. Always put a space after every full stop.
