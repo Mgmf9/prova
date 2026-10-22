@@ -12,12 +12,21 @@
   <p class="sub">Anexe as fotos da prova e receba as respostas em folhas com letra manuscrita.</p>
 
   <section>
-    <label class="drop" for="file">
-      <span>Escolher fotos da prova</span>
-      <small>Pode anexar várias de uma vez (até 12)</small>
-    </label>
+    <div class="btns">
+      <label class="drop" for="file">
+        <span>Escolher da galeria</span>
+        <small>Várias de uma vez (até 12)</small>
+      </label>
+      <label class="drop" for="cam">
+        <span>Tirar foto agora</span>
+        <small>Abre a câmera do aparelho</small>
+      </label>
+    </div>
     <input id="file" type="file" accept="image/*" multiple hidden>
+    <input id="cam" type="file" accept="image/*" capture="environment" hidden>
     <div id="thumbs"></div>
+    <label class="txtl" for="txt">Ou digite aqui: questões da prova, um exercício, ou o que você quer que seja escrito (pode usar junto com as fotos)</label>
+    <textarea id="txt" rows="6" placeholder="Ex.: Scrivi un testo su «Velocità di una reazione»: relazione 1 = concentrazione, relazione 2 = temperatura e catalizzatore&#10;ou: 1. 1. Che cosa si intende per microbiota umano? (3 pti, 5 righe)&#10;2. Scegli l'errato: a. ... b. ... c. ... d. ..."></textarea>
     <label class="check"><input id="compact" type="checkbox" checked> Nas questões de marcar, só número e letra</label>
     <button id="go" type="button">Gerar folhas</button>
     <p id="status" role="status"></p>
