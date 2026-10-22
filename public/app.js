@@ -246,7 +246,7 @@ function renderThumbs() {
   });
 }
 
-$('#file').addEventListener('change', async (e) => {
+for (const id of ['#file', '#cam']) $(id).addEventListener('change', async (e) => {
   const files = [...e.target.files];
   e.target.value = '';
   setStatus('Preparando as fotos…');
@@ -265,7 +265,8 @@ function setStatus(msg, err = false) {
 $('#compact').addEventListener('change', () => { if (exams.length) showResults(); });
 
 $('#go').addEventListener('click', async () => {
-  if (!photos.length) return setStatus('Anexe pelo menos uma foto.', true);
+  const text = $('#txt').value.trim();
+  if (!photos.length && !text) return setStatus('Anexe uma foto ou digite as questões.', true);
   const btn = $('#go');
   btn.disabled = true;
   setStatus('Lendo a prova e respondendo… isso pode levar cerca de um minuto.');
@@ -273,12 +274,12 @@ $('#go').addEventListener('click', async () => {
     const r = await fetch('/api/solve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ images: photos.map((p) => ({ data: p.data, type: p.type })) }),
+      body: JSON.stringify({ text, images: photos.map((p) => ({ data: p.data, type: p.type })) }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || `Erro ${r.status}`);
     exams = (j.exams || []).filter((e) => (e.questions || []).length);
-    if (!exams.length) throw new Error('Não encontrei questões nas fotos. Tente fotos mais nítidas.');
+    if (!exams.length) throw new Error('Não encontrei questões. Tente fotos mais nítidas ou digite o texto.');
     const hasDup = exams.some((e) => {
       const seen = new Set();
       return (e.questions || []).some((q) => { const k = String(q.number); if (seen.has(k)) return true; seen.add(k); return false; });
