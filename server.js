@@ -36,6 +36,7 @@ Schema:
 }]}
 
 Rules:
+- FREE MODE: the input is not always an exam. If the photos or the typed text are a single exercise, a topic, or an instruction to write something (for example «Velocità di una reazione: relazione 1 = in base alla concentrazione, relazione 2 = in base alla temperatura e al catalizzatore»), do NOT look for exam questions. Return ONE exam object with student_line "", header_lines [] and ONE question: number "1", type "written", prompt = a short restatement of the task, points "", answer = the full requested text or the full worked solution (steps of the exercise, formulas, final result), written in the language of the task and with the length the person asked for (if none is given, a complete but compact answer). In this mode ignore the 65-characters-per-line limit: set ruled_lines to the number of handwritten lines the answer needs (about 65 characters per line). Use several array elements (one per paragraph or step) when it reads better. If the input contains several separate exercises, make one written question for each, numbered 1, 2, 3.
 - One exam object per distinct exam. Two pages belong to the same exam ONLY if their printed titles match. Different printed titles (for example "Fondamenti della microbiologia" versus "EDUCAZIONE CIVICA: Il microbiota umano") are different exams: never put questions from two titles in one exam, even when the question numbers collide. Pages of the same exam may come in any order: merge them, sorted by printed question order. If a question shows up in more than one photo, include it once.
 - Stems and options can be split across photos or pages: a list of alternatives at the top of a photo belongs to the question stem at the bottom of the previous photo. Join them. Copy each prompt as printed. Never replace a question with a different one, and never write a question that is not printed.
 - Use the numbering printed on the exam (for example "5.12").
@@ -75,9 +76,10 @@ app.get('/api/models', async (_req, res) => {
 
 app.post('/api/solve', async (req, res) => {
   try {
-    const images = req.body?.images;
-    if (!Array.isArray(images) || images.length === 0) {
-      return res.status(400).json({ error: 'Envie pelo menos uma foto.' });
+    const images = Array.isArray(req.body?.images) ? req.body.images : [];
+    const typed = String(req.body?.text || '').trim().slice(0, 20000);
+    if (images.length === 0 && !typed) {
+      return res.status(400).json({ error: 'Envie uma foto ou digite as questões.' });
     }
     if (images.length > 12) return res.status(400).json({ error: 'No máximo 12 fotos por vez.' });
 
@@ -97,7 +99,8 @@ app.post('/api/solve', async (req, res) => {
         source: { type: 'base64', media_type: img.type || 'image/jpeg', data: img.data },
       });
     });
-    content.push({ type: 'text', text: 'Responda todas as questões das fotos. Devolva apenas o JSON.' });
+    if (typed) content.push({ type: 'text', text: 'Questões digitadas pelo aluno (tratar como parte da prova):\n' + typed });
+    content.push({ type: 'text', text: 'Responda todas as questões das fotos e do texto. Devolva apenas o JSON.' });
 
     const msg = await client.messages.create({
       model: MODEL,
