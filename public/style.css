@@ -37,3 +37,7 @@ summary{cursor:pointer;font-weight:500}
 .sheet{margin:16px 0}
 .sheet canvas{width:100%;height:auto;display:block;border:.5px solid var(--line);border-radius:8px;background:#fdfdfb}
 .bar{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.txtl{margin:14px 0 6px;color:var(--muted);font-size:14px}
+textarea{resize:vertical;min-height:110px}
