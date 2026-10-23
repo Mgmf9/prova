@@ -113,9 +113,11 @@ app.post('/api/solve', async (req, res) => {
       system: SYSTEM,
       messages: [{ role: 'user', content }],
     });
-    const text = msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    const textOf = (m) => m.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    const text = textOf(msg);
+    let result;
     try {
-      return res.json(parseJson(text));
+      result = parseJson(text);
     } catch (firstErr) {
       console.error('JSON inválido, tentando consertar:', firstErr.message);
       const fix = await client.messages.create({
@@ -124,9 +126,30 @@ app.post('/api/solve', async (req, res) => {
         system: 'You repair broken JSON. Return ONLY the corrected, strictly valid JSON, same content and structure, no commentary. Replace any double quotes inside string values with « » and remove trailing commas.',
         messages: [{ role: 'user', content: text }],
       });
-      const fixed = fix.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-      return res.json(parseJson(fixed));
+      result = parseJson(textOf(fix));
     }
+
+    if (process.env.VERIFY !== '0' && images.length) {
+      try {
+        const vContent = content.slice(0, -1);
+        vContent.push({
+          type: 'text',
+          text: 'Primeira leitura (JSON):\n' + JSON.stringify(result) +
+            '\n\nVerificação: releia as fotos com atenção e confira, questão por questão, (1) se o título/cabeçalho está igual ao impresso, (2) se cada prompt e cada alternativa existem de verdade na foto e estão com a letra certa, (3) se a letra marcada é realmente a correta (nas questões «errato/NON», marque só a falsa), (4) ortografia das respostas escritas. Corrija o que estiver errado; se uma alternativa não estiver legível, deixe answer_letters vazio e explique na note. Devolva o JSON completo corrigido, no mesmo formato, e nada mais.',
+        });
+        const v = await client.messages.create({
+          model: MODEL,
+          max_tokens: 8000,
+          system: SYSTEM,
+          messages: [{ role: 'user', content: vContent }],
+        });
+        const checked = parseJson(textOf(v));
+        if (Array.isArray(checked.exams) && checked.exams.length) result = checked;
+      } catch (ve) {
+        console.error('Verificação falhou, usando a primeira leitura:', ve.message);
+      }
+    }
+    return res.json(result);
   } catch (e) {
     console.error(e);
     const status = e.status && e.status >= 400 && e.status < 600 ? e.status : 500;
