@@ -40,6 +40,7 @@ Rules:
 - PROOFREAD: before replying, re-read every written answer and fix spelling, accents, doubled letters, missing spaces and stray words. Every word must be a real word of the exam's language. Never write placeholder or broken words.
 - MATCHING questions (column with parentheses «( )» to fill with a letter or number): use type «match». In answer, write one line per item printed in the column that has the parentheses, in the printed order, in the form «(C) Libertava escravos com mais de 65 anos» (the correct letter or number inside parentheses followed by that item's text copied from the exam). Check each pair against the course content; each letter is used once.
 - TRUE/FALSE or «mark the correct one» items where the photo shows only SOME of the alternatives (for example only A of a question that has A to D): you cannot know the right one. Set answer_letters to [] and write in note «alternativas B, C, D não aparecem na foto». Never pick the one that is visible just because it is the only one.
+- COUNT CHECK: if the stem states how many answers are correct («2 risposte corrette», «due risposte», «risposta multipla» with a number), answer_letters must contain exactly that many letters; if you have more, drop the letters that are not clearly right; if you have fewer, look again. Questions with «errato/falso/NON» and no stated number have exactly ONE letter: the single false alternative. Never invent alternatives that are not printed (for example an «f» when only a to e exist): every letter you give must exist in the options you read.
 - Use the exam's own spelling of names of laws, places and people.
 - FREE MODE: the input is not always an exam. If the photos or the typed text are a single exercise, a topic, or an instruction to write something (for example «Velocità di una reazione: relazione 1 = in base alla concentrazione, relazione 2 = in base alla temperatura e al catalizzatore»), do NOT look for exam questions. Return ONE exam object with student_line "", header_lines [] and ONE question: number "1", type "written", prompt = a short restatement of the task, points "", answer = the full requested text or the full worked solution (steps of the exercise, formulas, final result), written in the language of the task and with the length the person asked for (if none is given, a complete but compact answer). In this mode ignore the 65-characters-per-line limit: set ruled_lines to the number of handwritten lines the answer needs (about 65 characters per line). Use several array elements (one per paragraph or step) when it reads better. If the input contains several separate exercises, make one written question for each, numbered 1, 2, 3.
 - One exam object per distinct exam. Two pages belong to the same exam ONLY if their printed titles match. Different printed titles (for example "Fondamenti della microbiologia" versus "EDUCAZIONE CIVICA: Il microbiota umano") are different exams: never put questions from two titles in one exam, even when the question numbers collide. Pages of the same exam may come in any order: merge them, sorted by printed question order. If a question shows up in more than one photo, include it once.
@@ -149,6 +150,20 @@ app.post('/api/solve', async (req, res) => {
         console.error('Verificação falhou, usando a primeira leitura:', ve.message);
       }
     }
+    try {
+      for (const ex of result.exams || []) for (const q of ex.questions || []) {
+        if (q.type !== 'choice' || !Array.isArray(q.answer_letters)) continue;
+        const n = q.answer_letters.length;
+        const m = String(q.prompt || '').match(/\(?\s*(\d|due|tre)\s+rispost/i);
+        const want = m ? ({ due: 2, tre: 3 }[m[1].toLowerCase()] || Number(m[1])) : (q.asks_for === 'wrong' && !/multipl/i.test(q.prompt || '') ? 1 : 0);
+        const letters = Object.keys(q.options || {});
+        const bad = q.answer_letters.some((l) => letters.length && !letters.includes(String(l).toLowerCase()));
+        if ((want && n !== want) || bad) {
+          q.confidence = 'low';
+          q.note = ((q.note || '') + ' Número de letras ou alternativa estranho: confira na prova.').trim();
+        }
+      }
+    } catch { /* segue sem a checagem */ }
     return res.json(result);
   } catch (e) {
     console.error(e);
