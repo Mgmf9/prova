@@ -226,12 +226,32 @@ async function showResults() {
 
 async function fileToJpeg(file) {
   const bmp = await createImageBitmap(file);
-  const s = Math.min(1, 1800 / Math.max(bmp.width, bmp.height));
+  const s = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
   const c = document.createElement('canvas');
   c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
   c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-  const url = c.toDataURL('image/jpeg', 0.85);
+  const url = c.toDataURL('image/jpeg', 0.9);
   return { name: file.name, url, data: url.split(',')[1], type: 'image/jpeg' };
+}
+
+async function makeTiles(p, idx) {
+  const img = new Image();
+  await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = p.url; });
+  const W0 = img.naturalWidth, H0 = img.naturalHeight, ov = 0.12;
+  const tw = W0 * (0.5 + ov), th = H0 * (0.5 + ov);
+  const out = [];
+  let n = 0;
+  for (const ry of [0, 1]) for (const rx of [0, 1]) {
+    n++;
+    const sx = rx ? W0 - tw : 0, sy = ry ? H0 - th : 0;
+    const k = Math.min(1.6, 2000 / Math.max(tw, th));
+    const c = document.createElement('canvas');
+    c.width = Math.round(tw * k); c.height = Math.round(th * k);
+    c.getContext('2d').drawImage(img, sx, sy, tw, th, 0, 0, c.width, c.height);
+    const url = c.toDataURL('image/jpeg', 0.9);
+    out.push({ data: url.split(',')[1], type: 'image/jpeg', label: `Foto ${idx + 1}, trecho ${n} de 4 (mesma foto ampliada: ${ry ? 'metade de baixo' : 'metade de cima'}, ${rx ? 'lado direito' : 'lado esquerdo'}; as partes se sobrepõem um pouco)` });
+  }
+  return out;
 }
 
 function renderThumbs() {
@@ -271,10 +291,15 @@ $('#go').addEventListener('click', async () => {
   btn.disabled = true;
   setStatus('Lendo a prova e respondendo… isso pode levar cerca de um minuto.');
   try {
+    const images = [];
+    for (let i = 0; i < photos.length; i++) {
+      images.push({ data: photos[i].data, type: photos[i].type, label: `Foto ${i + 1} (inteira):` });
+      if ($('#zoom') && $('#zoom').checked) images.push(...await makeTiles(photos[i], i));
+    }
     const r = await fetch('/api/solve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, images: photos.map((p) => ({ data: p.data, type: p.type })) }),
+      body: JSON.stringify({ text, images }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || `Erro ${r.status}`);
