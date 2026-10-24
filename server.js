@@ -86,7 +86,7 @@ app.post('/api/solve', async (req, res) => {
     if (images.length === 0 && !typed) {
       return res.status(400).json({ error: 'Envie uma foto ou digite as questões.' });
     }
-    if (images.length > 12) return res.status(400).json({ error: 'No máximo 12 fotos por vez.' });
+    if (images.length > 60) return res.status(400).json({ error: 'Fotos demais de uma vez.' });
 
     if (MOCK) {
       const mock = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'mock.json'), 'utf8'));
@@ -98,14 +98,14 @@ app.post('/api/solve', async (req, res) => {
 
     const content = [];
     images.forEach((img, i) => {
-      content.push({ type: 'text', text: `Foto ${i + 1}:` });
+      content.push({ type: 'text', text: img.label ? String(img.label).slice(0, 300) : `Foto ${i + 1}:` });
       content.push({
         type: 'image',
         source: { type: 'base64', media_type: img.type || 'image/jpeg', data: img.data },
       });
     });
     if (typed) content.push({ type: 'text', text: 'Questões digitadas pelo aluno (tratar como parte da prova):\n' + typed });
-    content.push({ type: 'text', text: 'Responda todas as questões das fotos e do texto. Devolva apenas o JSON.' });
+    content.push({ type: 'text', text: 'Responda todas as questões das fotos e do texto. Trechos ampliados são a mesma foto: não repita questões, apenas use-os para ler melhor o texto pequeno, e leia o cabeçalho impresso exatamente como está. Devolva apenas o JSON.' });
 
     const msg = await client.messages.create({
       model: MODEL,
